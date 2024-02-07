@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	zipFilePath := "/Users/jonas/hello/test.docx"
+	zipFilePath := "./test.docx"
 	fileName := filepath.Base(zipFilePath)
 	extension := filepath.Ext(fileName)
 	fileNameWithoutExtension := fileName[:len(fileName)-len(extension)]
@@ -20,14 +20,95 @@ func main() {
 	unzip(zipFilePath, directoryPath+"/"+fileNameWithoutExtension)
 
 	// do stuff here
-	addParagraph(directoryPath + "/" + fileNameWithoutExtension + "/word/document.xml")
+	xmlDocPath := directoryPath + "/" + fileNameWithoutExtension + "/word/document.xml"
+	xmlDoc := readXmlFromFile(xmlDocPath)
+
+	paragraphs := parseParagraphs(xmlDoc)
+	iterate(paragraphs)
 
 	zipFolder(directoryPath+"/"+fileNameWithoutExtension, directoryPath+"/"+fileName)
 	deleteFolder(directoryPath + "/" + fileNameWithoutExtension)
 
 }
 
-// XML
+// converter
+
+func iterate(paragraphs []*etree.Element) {
+	for i := 0; i < len(paragraphs); i++ {
+		if pos := posOfBlankLine(textOfParagraph(paragraphs[i])); pos > -1 {
+			str := fmt.Sprintf("A blank line was found in paragraph %d at position %d", i, pos)
+			fmt.Println(str)
+		}
+	}
+}
+
+func posOfBlankLine(text string) int{
+	for i, char := range text {
+		if char == '\n' {
+			if text[i+1] == '\n' {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// DOCX
+
+func parseParagraphs(doc *etree.Document) []*etree.Element {
+
+	var getP func(node *etree.Element, arr *[]*etree.Element)
+	getP = func(node *etree.Element, arr *[]*etree.Element) {
+		for _, child := range node.ChildElements() {
+			getP(child, arr)
+		}
+		if node.Tag == "p" {
+			*arr = append(*arr, node)
+		}
+	}
+
+	var arr []*etree.Element
+	getP(doc.SelectElement("w:document"), &arr)
+	return arr
+}
+
+func textOfParagraph(paragraph *etree.Element) string{
+	var text string
+	runs := parseRuns(paragraph)
+	for _, r := range runs {
+		text += textOfRun(r)
+	}
+	return text
+}
+
+func parseRuns(paragraph *etree.Element) []*etree.Element{
+	var getR func(node *etree.Element, arr *[]*etree.Element)
+	getR = func(node *etree.Element, arr *[]*etree.Element) {
+		for _, child := range node.ChildElements() {
+			getR(child, arr)
+		}
+		if node.Tag == "r" {
+			*arr = append(*arr, node)
+		}
+	}
+
+	var arr []*etree.Element
+	getR(paragraph, &arr)
+	return arr
+}
+
+func textOfRun(run *etree.Element) string {
+	var text string
+	for _, child := range run.ChildElements() {
+		if child.Tag == "t" {
+			text += child.Text()
+		}
+		if child.Tag == "br" {
+			text += "\n"
+		}
+	}
+	return text
+}
 
 func addParagraph(docxPath string) {
 	// XML-Datei laden
@@ -43,7 +124,7 @@ func addParagraph(docxPath string) {
 	tElement := etree.NewElement("w:t")
 	pElement.AddChild(rElement)
 	rElement.AddChild(tElement)
-	tElement.SetText("A script has created me.")
+	// tElement.SetText("FOO")
 
 	// Den <w:body>-Knoten finden
 	body := doc.FindElement("/w:document/w:body")
@@ -63,6 +144,18 @@ func addParagraph(docxPath string) {
 
 	fmt.Println("New paragraph was successfully added to <w:body> node.")
 }
+
+// XML
+
+func readXmlFromFile(xmlFilePath string) *etree.Document {
+	doc := etree.NewDocument()
+	if err := doc.ReadFromFile(xmlFilePath); err != nil {
+		fmt.Println(err)
+	}
+	return doc
+}
+
+
 
 // Dateisystem
 
