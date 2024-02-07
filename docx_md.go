@@ -12,6 +12,7 @@ import (
 )
 
 func main() {
+	// preparation
 	zipFilePath := "./test.docx"
 	fileName := filepath.Base(zipFilePath)
 	extension := filepath.Ext(fileName)
@@ -22,13 +23,14 @@ func main() {
 	// do stuff here
 	xmlDocPath := directoryPath + "/" + fileNameWithoutExtension + "/word/document.xml"
 	xmlDoc := readXmlFromFile(xmlDocPath)
-
 	paragraphs := parseParagraphs(xmlDoc)
 	iterate(paragraphs)
+	// addParagraph(xmlDoc) // for test purposes only
 
+	// finish and clean up
+	writeXmlToFile(xmlDoc, xmlDocPath)
 	zipFolder(directoryPath+"/"+fileNameWithoutExtension, directoryPath+"/"+fileName)
 	deleteFolder(directoryPath + "/" + fileNameWithoutExtension)
-
 }
 
 // converter
@@ -110,13 +112,7 @@ func textOfRun(run *etree.Element) string {
 	return text
 }
 
-func addParagraph(docxPath string) {
-	// XML-Datei laden
-	doc := etree.NewDocument()
-	if err := doc.ReadFromFile(docxPath); err != nil {
-		fmt.Println("Error reading the XML file:", err)
-		return
-	}
+func addParagraph(doc *etree.Document) {
 
 	// Neues XML-Element erstellen
 	pElement := etree.NewElement("w:p")
@@ -124,7 +120,7 @@ func addParagraph(docxPath string) {
 	tElement := etree.NewElement("w:t")
 	pElement.AddChild(rElement)
 	rElement.AddChild(tElement)
-	// tElement.SetText("FOO")
+	tElement.SetText("TEST")
 
 	// Den <w:body>-Knoten finden
 	body := doc.FindElement("/w:document/w:body")
@@ -135,12 +131,6 @@ func addParagraph(docxPath string) {
 
 	// Das neue XML-Element zum <w:body>-Knoten hinzufügen
 	body.AddChild(pElement)
-
-	// Aktualisierte XML-Datei speichern
-	if err := doc.WriteToFile(docxPath); err != nil {
-		fmt.Println("Error when writing the updated XML file:", err)
-		return
-	}
 
 	fmt.Println("New paragraph was successfully added to <w:body> node.")
 }
@@ -155,7 +145,15 @@ func readXmlFromFile(xmlFilePath string) *etree.Document {
 	return doc
 }
 
-
+func writeXmlToFile(xmlFile *etree.Document, xmlFilePath string) {
+		// Aktualisierte XML-Datei speichern
+		if err := xmlFile.WriteToFile(xmlFilePath); err != nil {
+			fmt.Println("Error when writing the updated XML file:", err)
+			return
+		}
+		str := fmt.Sprintf("%s was saved successfully", xmlFilePath)
+		fmt.Println(str)
+}
 
 // Dateisystem
 
